@@ -1,0 +1,19 @@
+{
+    "frameworks": {
+        "aspnet50": {
+            "dependencies": {                
+                "System.Reflection": "",
+                "System.Threading.Tasks": ""
+            }
+        }
+    },
+    "dependencies": {
+        "xunit.assert": "99.99.99",
+        "xunit.execution": "99.99.99",
+        "xunit.runner.kre": ""
+    },
+    "commands": {
+        "run": "xunit.runner.kre -wait",
+        "test": "xunit.runner.kre"
+    }
+}

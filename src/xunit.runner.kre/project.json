@@ -1,0 +1,16 @@
+{
+    "frameworks": {
+        "aspnet50": {
+            "frameworkAssemblies": {
+                "System.Configuration": "",
+                "System.Runtime": "",
+                "System.Web.Extensions": "",
+                "System.XML": "",
+                "System.Xml.Linq": ""
+            }            
+        }
+    },
+    "dependencies": {
+        "xunit.runner.utility": "99.99.99"
+    }
+}
