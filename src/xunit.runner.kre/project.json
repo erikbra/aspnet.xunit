@@ -7,10 +7,24 @@
                 "System.Web.Extensions": "",
                 "System.XML": "",
                 "System.Xml.Linq": ""
-            }            
+            }
+        },
+        "aspnetcore50": {
+            "dependencies": {
+                "System.Collections": "4.0.10.0",
+                "System.Collections.Concurrent": "4.0.0.0",
+                "System.Console": "4.0.0.0",
+                "System.Diagnostics.Tools": "4.0.0.0",
+                "System.IO.FileSystem": "4.0.0.0",
+                "System.Linq": "4.0.0.0",
+                "System.Text.RegularExpressions": "4.0.0.0",
+                "System.Threading": "4.0.0.0",
+                "System.Xml.XDocument": "4.0.0.0"
+            }
         }
     },
     "dependencies": {
-        "xunit.runner.utility": "99.99.99"
+        "Microsoft.Framework.Runtime.Interfaces": "1.0.0-*",
+        "xunit.runner.utility": "2.0.0-*"
     }
 }

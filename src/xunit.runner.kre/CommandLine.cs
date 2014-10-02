@@ -8,28 +8,19 @@ namespace Xunit.ConsoleClient
     {
         readonly Stack<string> arguments = new Stack<string>();
 
-        protected CommandLine(string[] args, Predicate<string> fileExists = null)
+        protected CommandLine(string[] args)
         {
-            if (fileExists == null)
-                fileExists = fileName => File.Exists(fileName);
-
             for (var i = args.Length - 1; i >= 0; i--)
                 arguments.Push(args[i]);
 
             TeamCity = Environment.GetEnvironmentVariable("TEAMCITY_PROJECT_NAME") != null;
-            AppVeyor = Environment.GetEnvironmentVariable("APPVEYOR_API_URL") != null;
-            ParallelizeAssemblies = false;
             ParallelizeTestCollections = true;
-            Project = Parse(fileExists);
+            Project = Parse();
         }
-
-        public bool AppVeyor { get; protected set; }
 
         public int MaxParallelThreads { get; set; }
 
         public XunitProject Project { get; protected set; }
-
-        public bool ParallelizeAssemblies { get; protected set; }
 
         public bool ParallelizeTestCollections { get; set; }
 
@@ -61,20 +52,11 @@ namespace Xunit.ConsoleClient
             return new CommandLine(args);
         }
 
-        protected XunitProject Parse(Predicate<string> fileExists)
+        protected XunitProject Parse()
         {
             var filename = arguments.Pop();
-            if (!fileExists(filename))
-                throw new ArgumentException(String.Format("file not found: {0}", filename));
 
             string configFile = null;
-            if (arguments.Count > 0 && !arguments.Peek().StartsWith("-"))
-            {
-                configFile = arguments.Pop();
-
-                if (!fileExists(configFile))
-                    throw new ArgumentException(String.Format("config file not found: {0}", configFile));
-            }
 
             var project = GetSingleAssemblyProject(filename, configFile);
 
@@ -114,23 +96,12 @@ namespace Xunit.ConsoleClient
                     switch (parallelismOption)
                     {
                         case ParallelismOption.all:
-                            ParallelizeAssemblies = true;
-                            ParallelizeTestCollections = true;
-                            break;
-
-                        case ParallelismOption.assemblies:
-                            ParallelizeAssemblies = true;
-                            ParallelizeTestCollections = false;
-                            break;
-
                         case ParallelismOption.collections:
-                            ParallelizeAssemblies = false;
                             ParallelizeTestCollections = true;
                             break;
 
                         case ParallelismOption.none:
                         default:
-                            ParallelizeAssemblies = false;
                             ParallelizeTestCollections = false;
                             break;
                     }
@@ -139,11 +110,6 @@ namespace Xunit.ConsoleClient
                 {
                     GuardNoOptionValue(option);
                     TeamCity = true;
-                }
-                else if (optionName == "-appveyor")
-                {
-                    GuardNoOptionValue(option);
-                    AppVeyor = true;
                 }
                 else if (optionName == "-noshadow")
                 {

@@ -4,7 +4,6 @@
     {
         none,
         collections,
-        assemblies,
         all
     }
 }

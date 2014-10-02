@@ -7,118 +7,17 @@ using Xunit.Sdk;
 
 public class CommandLineTests
 {
-    public class Filename
-    {
-        [Fact]
-        public static void AssemblyFileNameNotPresentThrows()
-        {
-            var arguments = new string[1];
-            arguments[0] = "fileName";
-
-            var exception = Record.Exception(() =>
-                            {
-                                CommandLine.Parse(arguments);
-                            });
-
-            Assert.IsType<ArgumentException>(exception);
-            Assert.Equal("file not found: fileName", exception.Message);
-        }
-
-        [Fact]
-        public static void AssemblyFilePresentDoesNotThrow()
-        {
-            var arguments = new[] { "assemblyName.dll" };
-
-            Assert.DoesNotThrow(() =>
-            {
-                TestableCommandLine.Parse(arguments);
-            });
-        }
-
-        [Fact]
-        public static void DllExistsConfigFileDoesNotExist()
-        {
-            var arguments = new[] { "assemblyName.dll", "badConfig.config" };
-
-            var exception = Record.Exception(() => TestableCommandLine.Parse(arguments));
-
-            Assert.IsType<ArgumentException>(exception);
-            Assert.Equal("config file not found: badConfig.config", exception.Message);
-        }
-    }
-
     public class InvalidOption
     {
         [Fact]
         public static void OptionWithoutSlashThrows()
         {
-            var arguments = new[] { "assembly.dll", "assembly.config", "teamcity" };
+            var arguments = new[] { "assembly.dll", "teamcity" };
 
             var exception = Record.Exception(() => TestableCommandLine.Parse(arguments));
 
             Assert.IsType<ArgumentException>(exception);
             Assert.Equal("unknown command line option: teamcity", exception.Message);
-        }
-    }
-
-    public class AppVeyorOption
-    {
-        [Fact, AppVeyorEnvironmentRestore]
-        public static void AppVeyorOptionNotPassedAppVeyorFalse()
-        {
-            var arguments = new[] { "assemblyName.dll" };
-
-            var commandLine = TestableCommandLine.Parse(arguments);
-
-            Assert.False(commandLine.AppVeyor);
-        }
-
-        [Fact, AppVeyorEnvironmentRestore(Value = "AppVeyor")]
-        public static void AppVeyorOptionNotPassedEnvironmentSetAppVeyorTrue()
-        {
-            var arguments = new[] { "assemblyName.dll" };
-
-            var commandLine = TestableCommandLine.Parse(arguments);
-
-            Assert.True(commandLine.AppVeyor);
-        }
-
-        [Fact, AppVeyorEnvironmentRestore]
-        public static void AppVeyorOptionAppVeyorTrue()
-        {
-            var arguments = new[] { "assemblyName.dll", "-appveyor" };
-
-            var commandLine = TestableCommandLine.Parse(arguments);
-
-            Assert.True(commandLine.AppVeyor);
-        }
-
-        [Fact, AppVeyorEnvironmentRestore]
-        public static void AppVeyorOptionIgnoreCaseAppVeyorTrue()
-        {
-            var arguments = new[] { "assemblyName.dll", "-aPpVeyOr" };
-
-            var commandLine = TestableCommandLine.Parse(arguments);
-
-            Assert.True(commandLine.AppVeyor);
-        }
-
-        class AppVeyorEnvironmentRestore : BeforeAfterTestAttribute
-        {
-            string originalValue;
-
-            public string Value { get; set; }
-
-            public override void Before(MethodInfo methodUnderTest)
-            {
-                originalValue = Environment.GetEnvironmentVariable("APPVEYOR_API_URL");
-                Environment.SetEnvironmentVariable("APPVEYOR_API_URL", Value);
-            }
-
-            public override void After(MethodInfo methodUnderTest)
-            {
-                Environment.SetEnvironmentVariable("APPVEYOR_API_URL", originalValue);
-            }
         }
     }
 
@@ -549,7 +448,6 @@ public class CommandLineTests
         {
             var project = TestableCommandLine.Parse("assemblyName.dll");
 
-            Assert.False(project.ParallelizeAssemblies);
             Assert.True(project.ParallelizeTestCollections);
         }
 
@@ -564,15 +462,13 @@ public class CommandLineTests
         }
 
         [Theory]
-        [InlineData("none", false, false)]
-        [InlineData("assemblies", true, false)]
-        [InlineData("collections", false, true)]
-        [InlineData("all", true, true)]
-        public static void ParallelCanBeTurnedOn(string parallelOption, bool expectedAssemblyParallelization, bool expectedCollectionsParallelization)
+        [InlineData("none", false)]
+        [InlineData("collections", true)]
+        [InlineData("all", true)]
+        public static void ParallelCanBeTurnedOn(string parallelOption, bool expectedCollectionsParallelization)
         {
             var project = TestableCommandLine.Parse("assemblyName.dll", "-parallel", parallelOption);
 
-            Assert.Equal(expectedAssemblyParallelization, project.ParallelizeAssemblies);
             Assert.Equal(expectedCollectionsParallelization, project.ParallelizeTestCollections);
         }
     }
@@ -606,7 +502,7 @@ public class CommandLineTests
     class TestableCommandLine : CommandLine
     {
         private TestableCommandLine(params string[] arguments)
-            : base(arguments, filename => filename != "badConfig.config") { }
+            : base(arguments) { }
 
         public new static TestableCommandLine Parse(params string[] arguments)
         {
