@@ -1,7 +1,7 @@
 {
     "frameworks": {
         "aspnet50": {
-            "dependencies": {
+            "frameworkAssemblies": {
                 "System.Reflection": "",
                 "System.Threading.Tasks": ""
             }
