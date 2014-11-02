@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 using Microsoft.Framework.Runtime;
+using Microsoft.Framework.TestAdapter;
+using Xunit.Abstractions;
+using VsTestCase = Microsoft.Framework.TestAdapter.Test;
 
 namespace Xunit.ConsoleClient
 {
@@ -17,10 +19,12 @@ namespace Xunit.ConsoleClient
         readonly ConcurrentDictionary<string, ExecutionSummary> completionMessages = new ConcurrentDictionary<string, ExecutionSummary>();
 
         private readonly IApplicationEnvironment _appEnv;
+        private readonly IServiceProvider _services;
 
-        public Program(IApplicationEnvironment appEnv)
+        public Program(IApplicationEnvironment appEnv, IServiceProvider services)
         {
             _appEnv = appEnv;
+            _services = services;
         }
 
         [STAThread]
@@ -64,9 +68,15 @@ namespace Xunit.ConsoleClient
 
                 var commandLine = CommandLine.Parse(args);
 
-                var failCount = RunProject(defaultDirectory, commandLine.Project, commandLine.TeamCity,
-                                           commandLine.ParallelizeTestCollections,
-                                           commandLine.MaxParallelThreads);
+                int failCount = RunProject(
+                    defaultDirectory,
+                    commandLine.Project,
+                    commandLine.TeamCity,
+                    commandLine.ParallelizeTestCollections,
+                    commandLine.MaxParallelThreads,
+                    commandLine.DesignTime,
+                    commandLine.List,
+                    commandLine.DesignTimeTestUniqueNames);
 
                 if (commandLine.Wait)
                 {
@@ -141,7 +151,15 @@ namespace Xunit.ConsoleClient
                                   transform.Description);
         }
 
-        int RunProject(string defaultDirectory, XunitProject project, bool teamcity, bool parallelizeTestCollections, int maxThreadCount)
+        int RunProject(
+            string defaultDirectory, 
+            XunitProject project, 
+            bool teamCity, 
+            bool parallelizeTestCollections, 
+            int maxThreadCount, 
+            bool designTime,
+            bool list,
+            IReadOnlyList<string> designTimeFullyQualifiedNames)
         {
             XElement assembliesElement = null;
             var xmlTransformers = TransformFactory.GetXmlTransformers(project);
@@ -159,7 +177,19 @@ namespace Xunit.ConsoleClient
 
                 foreach (var assembly in project.Assemblies)
                 {
-                    var assemblyElement = ExecuteAssembly(consoleLock, defaultDirectory, assembly, needsXml, teamcity, parallelizeTestCollections, maxThreadCount, project.Filters);
+                    var assemblyElement = ExecuteAssembly(
+                        consoleLock, 
+                        defaultDirectory, 
+                        assembly, 
+                        needsXml, 
+                        teamCity,
+                        parallelizeTestCollections,
+                        maxThreadCount,
+                        project.Filters,
+                        designTime,
+                        list,
+                        designTimeFullyQualifiedNames);
+
                     if (assemblyElement != null)
                         assembliesElement.Add(assemblyElement);
                 }
@@ -221,7 +251,11 @@ namespace Xunit.ConsoleClient
             return failed ? 1 : completionMessages.Values.Sum(summary => summary.Failed);
         }
 
-        XmlTestExecutionVisitor CreateVisitor(object consoleLock, string defaultDirectory, XElement assemblyElement, bool teamCity)
+        private TestMessageVisitor<ITestAssemblyFinished> CreateVisitor(
+            object consoleLock,
+            string defaultDirectory, 
+            XElement assemblyElement, 
+            bool teamCity)
         {
             if (teamCity)
                 return new TeamCityVisitor(assemblyElement, () => cancel);
@@ -229,17 +263,30 @@ namespace Xunit.ConsoleClient
             return new StandardOutputVisitor(consoleLock, defaultDirectory, assemblyElement, () => cancel, completionMessages);
         }
 
-        XElement ExecuteAssembly(object consoleLock, string defaultDirectory, XunitProjectAssembly assembly, bool needsXml, bool teamCity, bool parallelizeTestCollections, int maxThreadCount, XunitFilters filters)
+        XElement ExecuteAssembly(
+            object consoleLock, 
+            string defaultDirectory, 
+            XunitProjectAssembly assembly, 
+            bool needsXml, 
+            bool teamCity, 
+            bool parallelizeTestCollections, 
+            int maxThreadCount, 
+            XunitFilters filters,
+            bool designTime,
+            bool list,
+            IReadOnlyList<string> designTimeFullyQualifiedNames)
         {
             if (cancel)
                 return null;
 
             var assemblyElement = needsXml ? new XElement("assembly") : null;
+            var assemblyName = Path.GetFileNameWithoutExtension(assembly.AssemblyFilename);
 
             try
             {
+
                 lock (consoleLock)
-                    Console.WriteLine("Discovering: {0}", Path.GetFileNameWithoutExtension(assembly.AssemblyFilename));
+                    Console.WriteLine("Discovering: {0}", assemblyName);
 
                 using (var controller = new XunitFrontController(assembly.AssemblyFilename, assembly.ConfigFilename, assembly.ShadowCopy))
                 using (var discoveryVisitor = new TestDiscoveryVisitor())
@@ -247,12 +294,98 @@ namespace Xunit.ConsoleClient
                     controller.Find(includeSourceInformation: false, messageSink: discoveryVisitor, options: new TestFrameworkOptions());
                     discoveryVisitor.Finished.WaitOne();
 
-                    lock (consoleLock)
-                        Console.WriteLine("Discovered:  {0}", Path.GetFileNameWithoutExtension(assembly.AssemblyFilename));
+                    IDictionary<ITestCase, VsTestCase> vsTestcases = null;
+                    if (designTime)
+                    {
+                        vsTestcases = DesignTimeTestConverter.Convert(discoveryVisitor.TestCases);
+                    }
 
-                    var executionOptions = new XunitExecutionOptions { DisableParallelization = !parallelizeTestCollections, MaxParallelThreads = maxThreadCount };
-                    var resultsVisitor = CreateVisitor(consoleLock, defaultDirectory, assemblyElement, teamCity);
-                    controller.RunTests(discoveryVisitor.TestCases.Where(filters.Filter).ToList(), resultsVisitor, executionOptions);
+                    lock (consoleLock)
+                        Console.WriteLine("Discovered:  {0}", assemblyName);
+
+                    if (list)
+                    {
+                        lock (consoleLock)
+                        {
+                            if (designTime)
+                            {
+                                var sink = (ITestDiscoverySink)_services.GetService(typeof(ITestDiscoverySink));
+
+                                foreach (var testcase in vsTestcases.Values)
+                                {
+                                    if (sink != null)
+                                    {
+                                        sink.SendTest(testcase);
+                                    }
+
+                                    Console.WriteLine(testcase.FullyQualifiedName);
+                                }
+                            }
+                            else
+                            {
+                                foreach (var testcase in discoveryVisitor.TestCases)
+                                {
+                                    Console.WriteLine(testcase.DisplayName);
+                                }
+                            }
+                        }
+
+                        return assemblyElement;
+                    }
+
+                    var executionOptions = new XunitExecutionOptions()
+                    {
+                        DisableParallelization = !parallelizeTestCollections,
+                        MaxParallelThreads = maxThreadCount,
+                    };
+
+                    var resultsVisitor = CreateVisitor(
+                        consoleLock, 
+                        defaultDirectory, 
+                        assemblyElement, 
+                        teamCity);
+
+                    if (designTime)
+                    {
+                        var sink = (ITestExecutionSink)_services.GetService(typeof(ITestExecutionSink));
+                        resultsVisitor = new DesignTimeExecutionVisitor(
+                            sink, 
+                            vsTestcases, 
+                            resultsVisitor);
+                    }
+
+                    IEnumerable<ITestCase> testsToRun;
+                    if (designTime)
+                    {
+                        if (designTimeFullyQualifiedNames.Count == 0)
+                        {
+                            testsToRun = discoveryVisitor.TestCases;
+                        }
+                        else
+                        {
+                            var tests = new List<ITestCase>();
+
+                            foreach (var uniqueName in designTimeFullyQualifiedNames)
+                            {
+                                foreach (var kvp in vsTestcases)
+                                {
+                                    if (string.Equals(kvp.Value.FullyQualifiedName, uniqueName, StringComparison.Ordinal))
+                                    {
+                                        tests.Add(kvp.Key);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            testsToRun = tests;
+                        }
+                    }
+                    else
+                    {
+                        testsToRun = discoveryVisitor.TestCases.Where(filters.Filter).ToList();
+                    }
+
+                    controller.RunTests(testsToRun, resultsVisitor, executionOptions);
                     resultsVisitor.Finished.WaitOne();
                 }
             }

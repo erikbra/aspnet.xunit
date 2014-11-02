@@ -1,4 +1,5 @@
 {
+    "version": "1.0.0-*",
     "frameworks": {
         "aspnet50": {
             "frameworkAssemblies": {
@@ -17,6 +18,8 @@
                 "System.Diagnostics.Tools": "4.0.0-beta-*",
                 "System.IO.FileSystem": "4.0.0-beta-*",
                 "System.Linq": "4.0.0-beta-*",
+                "System.Security.Cryptography.Hashing": "4.0.0-beta-*",
+                "System.Security.Cryptography.Hashing.Algorithms": "4.0.0-beta-*",
                 "System.Text.RegularExpressions": "4.0.0-beta-*",
                 "System.Threading": "4.0.0-beta-*",
                 "System.Xml.XDocument": "4.0.0-beta-*"
@@ -24,6 +27,8 @@
         }
     },
     "dependencies": {
+        "Microsoft.Framework.TestAdapter": "1.0.0-*",
+        "Microsoft.Framework.TestHost": "1.0.0-*",
         "Microsoft.Framework.Runtime.Interfaces": "1.0.0-*",
         "xunit.runner.utility": "2.0.0-*"
     }

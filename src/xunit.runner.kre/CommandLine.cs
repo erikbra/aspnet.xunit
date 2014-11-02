@@ -15,8 +15,16 @@ namespace Xunit.ConsoleClient
 
             TeamCity = Environment.GetEnvironmentVariable("TEAMCITY_PROJECT_NAME") != null;
             ParallelizeTestCollections = true;
+            DesignTimeTestUniqueNames = new List<string>();
             Project = Parse();
         }
+
+        public bool DesignTime { get; set; }
+
+        // Used with --designtime - to specify specific tests by uniqueId.
+        public List<string> DesignTimeTestUniqueNames { get; private set; }
+
+        public bool List { get; set; }
 
         public int MaxParallelThreads { get; set; }
 
@@ -149,6 +157,25 @@ namespace Xunit.ConsoleClient
                         throw new ArgumentException("missing argument for -testname");
 
                     project.Filters.IncludedNames.Add(option.Value);
+                }
+                else if (optionName == "-test" || optionName == "--test")
+                {
+                    if (option.Value == null)
+                    {
+                        throw new ArgumentException("missing argument for --test");
+                    }
+
+                    DesignTimeTestUniqueNames.Add(option.Value);
+                }
+                else if (optionName == "-list" || optionName == "--list")
+                {
+                    GuardNoOptionValue(option);
+                    List = true;
+                }
+                else if (optionName == "-designtime" || optionName == "--designtime")
+                {
+                    GuardNoOptionValue(option);
+                    DesignTime = true;
                 }
                 else
                 {
