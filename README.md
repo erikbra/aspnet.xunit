@@ -21,7 +21,7 @@ To install this package, add the following to your project.json
 
 To run tests from the command line, use the following.
 
-```Batchfile
+```Shell
 # Restore NuGet packages
 kpm restore
 
