@@ -30,6 +30,7 @@
         "Microsoft.Framework.TestAdapter": "1.0.0-*",
         "Microsoft.Framework.TestHost": "1.0.0-*",
         "Microsoft.Framework.Runtime.Interfaces": "1.0.0-*",
+        "xunit.execution": "2.0.0-*",
         "xunit.runner.utility": "2.0.0-*"
     }
 }

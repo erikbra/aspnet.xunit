@@ -10,7 +10,6 @@ To install this package, add the following to your project.json
 {
     "dependencies": {
         "xunit": "2.0.0-*",
-        "xunit.execution": "2.0.0-*",
         "xunit.runner.kre": "1.0.0-*"
     },
     "commands": {
