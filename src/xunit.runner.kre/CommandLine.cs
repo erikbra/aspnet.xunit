@@ -36,17 +36,19 @@ namespace Xunit.ConsoleClient
 
         public bool Wait { get; protected set; }
 
-        static XunitProject GetSingleAssemblyProject(string assemblyFile, string configFile)
+        static XunitProject GetProjectFile(List<Tuple<string, string>> assemblies)
         {
-            return new XunitProject
-            {
-                new XunitProjectAssembly
+            var result = new XunitProject();
+
+            foreach (var assembly in assemblies)
+                result.Add(new XunitProjectAssembly
                 {
-                    AssemblyFilename = assemblyFile,
-                    ConfigFilename = configFile,
+                    AssemblyFilename = Path.GetFullPath(assembly.Item1),
+                    ConfigFilename = assembly.Item2 != null ? Path.GetFullPath(assembly.Item2) : null,
                     ShadowCopy = true
-                }
-            };
+                });
+
+            return result;
         }
 
         static void GuardNoOptionValue(KeyValuePair<string, string> option)
@@ -62,11 +64,24 @@ namespace Xunit.ConsoleClient
 
         protected XunitProject Parse()
         {
-            var filename = arguments.Pop();
+            var assemblies = new List<Tuple<string, string>>();
 
-            string configFile = null;
+            while (arguments.Count > 0)
+            {
+                if (arguments.Peek().StartsWith("-"))
+                    break;
 
-            var project = GetSingleAssemblyProject(filename, configFile);
+                var assemblyFile = arguments.Pop();
+
+                string configFile = null;
+
+                assemblies.Add(Tuple.Create(assemblyFile, configFile));
+            }
+
+            if (assemblies.Count == 0)
+                throw new ArgumentException("must specify at least one assembly");
+
+            var project = GetProjectFile(assemblies);
 
             while (arguments.Count > 0)
             {
@@ -151,12 +166,19 @@ namespace Xunit.ConsoleClient
                     var value = pieces[1];
                     project.Filters.ExcludedTraits.Add(name, value);
                 }
-                else if (optionName == "-testname")
+                else if (optionName == "-class")
                 {
                     if (option.Value == null)
-                        throw new ArgumentException("missing argument for -testname");
+                        throw new ArgumentException("missing argument for -class");
 
-                    project.Filters.IncludedNames.Add(option.Value);
+                    project.Filters.IncludedClasses.Add(option.Value);
+                }
+                else if (optionName == "-method")
+                {
+                    if (option.Value == null)
+                        throw new ArgumentException("missing argument for -method");
+
+                    project.Filters.IncludedMethods.Add(option.Value);
                 }
                 else if (optionName == "-test" || optionName == "--test")
                 {

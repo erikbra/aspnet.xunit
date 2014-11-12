@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using Xunit;
@@ -7,20 +8,32 @@ using Xunit.Sdk;
 
 public class CommandLineTests
 {
-    public class InvalidOption
+    public class Filename
     {
         [Fact]
-        public static void OptionWithoutSlashThrows()
+        public static void MultipleAssembliesDoesNotThrow()
         {
-            var arguments = new[] { "assembly.dll", "teamcity" };
+            var arguments = new[] { "assemblyName.dll", "assemblyName2.dll" };
 
-            var exception = Record.Exception(() => TestableCommandLine.Parse(arguments));
+            var result = TestableCommandLine.Parse(arguments);
 
-            Assert.IsType<ArgumentException>(exception);
-            Assert.Equal("unknown command line option: teamcity", exception.Message);
+            Assert.Collection(result.Project,
+                a =>
+                {
+                    Assert.Equal(Path.GetFullPath("assemblyName.dll"), a.AssemblyFilename);
+                    Assert.Null(a.ConfigFilename);
+                    Assert.True(a.ShadowCopy);
+                },
+                a =>
+                {
+                    Assert.Equal(Path.GetFullPath("assemblyName2.dll"), a.AssemblyFilename);
+                    Assert.Null(a.ConfigFilename);
+                    Assert.True(a.ShadowCopy);
+                }
+            );
         }
     }
-    
+
     public class MaxThreadsOption
     {
         [Fact]
@@ -389,55 +402,107 @@ public class CommandLineTests
         }
     }
 
-    public class TestNameArgument
+    public class MethodArgument
     {
         [Fact]
-        public void TestNameArgumentNotPassed()
+        public static void MethodArgumentNotPassed()
         {
             var arguments = new[] { "assemblyName.dll" };
 
             var commandLine = TestableCommandLine.Parse(arguments);
 
-            Assert.Equal(0, commandLine.Project.Filters.IncludedNames.Count);
+            Assert.Equal(0, commandLine.Project.Filters.IncludedMethods.Count);
         }
 
         [Fact]
-        public void SingleValidTestNameArgument()
+        public static void SingleValidMethodArgument()
         {
             const string name = "Namespace.Class.Method1";
 
-            var arguments = new[] { "assemblyName.dll", "-testname", name };
+            var arguments = new[] { "assemblyName.dll", "-method", name };
 
             var commandLine = TestableCommandLine.Parse(arguments);
 
-            Assert.Equal(1, commandLine.Project.Filters.IncludedNames.Count);
-            Assert.True(commandLine.Project.Filters.IncludedNames.Contains(name));
+            Assert.Equal(1, commandLine.Project.Filters.IncludedMethods.Count);
+            Assert.True(commandLine.Project.Filters.IncludedMethods.Contains(name));
         }
 
         [Fact]
-        public void MultipleValidTestNameArguments()
+        public static void MultipleValidMethodArguments()
         {
             const string name1 = "Namespace.Class.Method1";
             const string name2 = "Namespace.Class.Method2";
 
-            var arguments = new[] { "assemblyName.dll", "-testname", name1, "-testname", name2 };
+            var arguments = new[] { "assemblyName.dll", "-method", name1, "-method", name2 };
 
             var commandLine = TestableCommandLine.Parse(arguments);
 
-            Assert.Equal(2, commandLine.Project.Filters.IncludedNames.Count);
-            Assert.True(commandLine.Project.Filters.IncludedNames.Contains(name1));
-            Assert.True(commandLine.Project.Filters.IncludedNames.Contains(name2));
+            Assert.Equal(2, commandLine.Project.Filters.IncludedMethods.Count);
+            Assert.True(commandLine.Project.Filters.IncludedMethods.Contains(name1));
+            Assert.True(commandLine.Project.Filters.IncludedMethods.Contains(name2));
         }
 
         [Fact]
-        public void MissingOptionValue()
+        public static void MissingOptionValue()
         {
-            var arguments = new[] { "assemblyName.dll", "-testname" };
+            var arguments = new[] { "assemblyName.dll", "-method" };
 
             var ex = Record.Exception(() => TestableCommandLine.Parse(arguments));
 
             Assert.IsType<ArgumentException>(ex);
-            Assert.Equal("missing argument for -testname", ex.Message);
+            Assert.Equal("missing argument for -method", ex.Message);
+        }
+    }
+
+    public class ClassArgument
+    {
+        [Fact]
+        public static void ClassArgumentNotPassed()
+        {
+            var arguments = new[] { "assemblyName.dll" };
+
+            var commandLine = TestableCommandLine.Parse(arguments);
+
+            Assert.Equal(0, commandLine.Project.Filters.IncludedMethods.Count);
+        }
+
+        [Fact]
+        public static void SingleValidClassArgument()
+        {
+            const string name = "Namespace.Class";
+
+            var arguments = new[] { "assemblyName.dll", "-class", name };
+
+            var commandLine = TestableCommandLine.Parse(arguments);
+
+            Assert.Equal(1, commandLine.Project.Filters.IncludedClasses.Count);
+            Assert.True(commandLine.Project.Filters.IncludedClasses.Contains(name));
+        }
+
+        [Fact]
+        public static void MultipleValidClassArguments()
+        {
+            const string name1 = "Namespace.Class1";
+            const string name2 = "Namespace.Class2";
+
+            var arguments = new[] { "assemblyName.dll", "-class", name1, "-class", name2 };
+
+            var commandLine = TestableCommandLine.Parse(arguments);
+
+            Assert.Equal(2, commandLine.Project.Filters.IncludedClasses.Count);
+            Assert.True(commandLine.Project.Filters.IncludedClasses.Contains(name1));
+            Assert.True(commandLine.Project.Filters.IncludedClasses.Contains(name2));
+        }
+
+        [Fact]
+        public static void MissingOptionValue()
+        {
+            var arguments = new[] { "assemblyName.dll", "-class" };
+
+            var ex = Record.Exception(() => TestableCommandLine.Parse(arguments));
+
+            Assert.IsType<ArgumentException>(ex);
+            Assert.Equal("missing argument for -class", ex.Message);
         }
     }
 
@@ -496,61 +561,6 @@ public class CommandLineTests
             var output = Assert.Single(commandLine.Project.Output);
             Assert.Equal("xml", output.Key);
             Assert.Equal("foo.xml", output.Value);
-        }
-    }
-
-    public class DesignTimeSwitch
-    {
-        [Theory]
-        [InlineData("-designtime")]
-        [InlineData("--designtime")]
-        public static void DesignTime(string arg)
-        {
-            var arguments = new[] { "assemblyName.dll", arg };
-
-            var commandLine = TestableCommandLine.Parse(arguments);
-
-            Assert.True(commandLine.DesignTime);
-        }
-    }
-
-    public class ListSwitch
-    {
-        [Theory]
-        [InlineData("-list")]
-        [InlineData("--list")]
-        public static void List(string arg)
-        {
-            var arguments = new[] { "assemblyName.dll", arg };
-
-            var commandLine = TestableCommandLine.Parse(arguments);
-
-            Assert.True(commandLine.List);
-        }
-    }
-
-    public class TestArgument
-    {
-        [Fact]
-        public static void TestUniqueNames()
-        {
-            var arguments = new[]
-            {
-                "assemblyName.dll",
-                "-test",
-                "foo",
-                "--test",
-                "bar",
-                "--test",
-                "baz",
-            };
-
-            var commandLine = TestableCommandLine.Parse(arguments);
-
-            Assert.Equal(3, commandLine.DesignTimeTestUniqueNames.Count);
-            Assert.Contains("foo", commandLine.DesignTimeTestUniqueNames);
-            Assert.Contains("bar", commandLine.DesignTimeTestUniqueNames);
-            Assert.Contains("baz", commandLine.DesignTimeTestUniqueNames);
         }
     }
 

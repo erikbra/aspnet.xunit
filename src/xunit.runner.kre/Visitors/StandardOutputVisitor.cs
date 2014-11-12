@@ -44,7 +44,7 @@ namespace Xunit.ConsoleClient
                 Console.WriteLine("Finished:    {0}", Path.GetFileNameWithoutExtension(assemblyFileName));
 
             if (completionMessages != null)
-                completionMessages.TryAdd(assemblyFileName, new ExecutionSummary
+                completionMessages.TryAdd(Path.GetFileNameWithoutExtension(assemblyFileName), new ExecutionSummary
                 {
                     Total = assemblyFinished.TestsRun,
                     Failed = assemblyFinished.TestsFailed,
@@ -168,7 +168,7 @@ namespace Xunit.ConsoleClient
 
             Console.ForegroundColor = ConsoleColor.Gray;
             foreach (var stackFrame in stackTrace.Split(new[] { Environment.NewLine }, StringSplitOptions.None))
-                          Console.Error.WriteLine("         {0}", StackFrameTransformer.TransformFrame(stackFrame, defaultDirectory));
+                Console.Error.WriteLine("         {0}", StackFrameTransformer.TransformFrame(stackFrame, defaultDirectory));
         }
     }
 }
