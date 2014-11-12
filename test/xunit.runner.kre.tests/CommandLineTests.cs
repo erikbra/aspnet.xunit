@@ -563,6 +563,61 @@ public class CommandLineTests
             Assert.Equal("foo.xml", output.Value);
         }
     }
+ 
+    public class DesignTimeSwitch
+    {
+        [Theory]
+        [InlineData("-designtime")]
+        [InlineData("--designtime")]
+        public static void DesignTime(string arg)
+        {
+            var arguments = new[] { "assemblyName.dll", arg };
+
+            var commandLine = TestableCommandLine.Parse(arguments);
+
+            Assert.True(commandLine.DesignTime);
+        }
+    }
+
+    public class ListSwitch
+    {
+        [Theory]
+        [InlineData("-list")]
+        [InlineData("--list")]
+        public static void List(string arg)
+        {
+            var arguments = new[] { "assemblyName.dll", arg };
+
+            var commandLine = TestableCommandLine.Parse(arguments);
+
+            Assert.True(commandLine.List);
+        }
+    }
+
+    public class TestArgument
+    {
+        [Fact]
+        public static void TestUniqueNames()
+        {
+            var arguments = new[]
+            {
+                "assemblyName.dll",
+                "-test",
+                "foo",
+                "--test",
+                "bar",
+                "--test",
+                "baz",
+            };
+
+            var commandLine = TestableCommandLine.Parse(arguments);
+
+            Assert.Equal(3, commandLine.DesignTimeTestUniqueNames.Count);
+            Assert.Contains("foo", commandLine.DesignTimeTestUniqueNames);
+            Assert.Contains("bar", commandLine.DesignTimeTestUniqueNames);
+            Assert.Contains("baz", commandLine.DesignTimeTestUniqueNames);
+        }
+    }
 
     class TestableCommandLine : CommandLine
     {
